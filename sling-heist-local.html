@@ -9,6 +9,8 @@
 /* Clean mode preserves a visible pause control for touch players. */
 .hud.clean .hud-stat,.hud.clean .combo{display:none}.hud.clean #pauseBtn{margin-left:auto}
 
+.character-quip{position:absolute;z-index:3;left:50%;bottom:22%;transform:translateX(-50%);max-width:min(420px,88vw);padding:10px 16px;border:1px solid #9aa99a;border-radius:12px 12px 12px 2px;background:#f2ead3;color:#243b38;box-shadow:0 6px 20px #0005;font-size:12px;line-height:1.35;font-weight:700;text-align:center;pointer-events:none}.character-quip::before{content:'THE THIEF';display:block;color:#936b30;font-size:8px;letter-spacing:1.3px;margin-bottom:3px}@media(max-width:700px){.character-quip{bottom:22%;font-size:11px}.game-hint{max-width:95vw;font-size:9px;letter-spacing:.7px}}
+
 </style>
   <script>window.SLING_HEIST_STANDALONE = true;</script>
 </head>
@@ -23,7 +25,8 @@
     <div class="bottom-copy"><span>✦</span> A LITTLE RISK. A LOT OF REWARD. <span>✦</span></div>
   </main>
   <div id="hud" class="hud hidden"><div class="hud-stat"><span>DISTANCE</span><strong id="distance">0 <small>M</small></strong></div><div class="hud-stat"><span>LOOT</span><strong class="gold-text">● <span id="runCoins">0</span></strong></div><div id="combo" class="combo">COMBO <b>×1</b></div><button id="pauseBtn" class="icon-button" aria-label="Pause">Ⅱ</button></div>
-  <div id="hint" class="game-hint hidden">HOLD TO GRAPPLE <span>•</span> RELEASE TO FLY</div><div id="toast" class="toast hidden"></div>
+  <div id="quip" class="character-quip hidden" role="status" aria-live="polite"></div>
+  <div id="hint" class="game-hint hidden">HOLD TO START &amp; GRAPPLE <span>•</span> RELEASE TO FLY</div><div id="toast" class="toast hidden"></div>
   <div id="overlay" class="overlay hidden"><div id="panel" class="panel"></div></div>
   <div id="banner-wrap" class="banner-wrap hidden"><span>ADVERTISEMENT</span><div id="banner"></div></div>
   <footer id="footer"><span>© SLING HEIST</span><span>MADE FOR THE GETAWAY <span class="footer-star">✦</span></span><div><button id="missionsBtn">MISSIONS ✦</button> &nbsp; <button id="saveBtn">SAVE PROGRESS ↗</button></div></footer>
@@ -35,8 +38,10 @@
     WIDTH: 1280,
     HEIGHT: 720,
     STEP: 1 / 60,
-    GRAVITY: 1800,
+    GRAVITY: 1100,
     DRAG: 0.995,
+    TIME_SCALE: 0.72,
+    START_SPEED: 260,
     REACH: 450,
     CONE: Math.PI / 3,
     REEL: 0.995,
@@ -371,6 +376,19 @@
     return { hit: distance <= hitDistance, near: distance > hitDistance && distance < hitDistance + CONFIG.NEAR_MISS, distance };
   }
 
+  // dialogue.js
+  var DIALOGUE = {
+    ready: ["You pull the strings. Literally.", "No rush. This vault isn't going anywhere.", "You handle the rope. I'll handle looking cool."],
+    perfect: ["Did you see that? I definitely meant to do that.", "We make a pretty good getaway team.", "That was dangerously smooth."],
+    near: ["I meant to do that. Mostly.", "Let's keep that between us and the laser.", "Okay, that was a little close."],
+    death: ["Well, that was practice. We've got this.", "Same team. New plan. Less floor.", "The vault won that round. It won't win them all.", "Good news: we can try that again."]
+  };
+  function chooseDialogue(kind, random = Math.random) {
+    const lines = DIALOGUE[kind] || [];
+    if (!lines.length) return "";
+    return lines[Math.min(lines.length - 1, Math.floor(random() * lines.length))];
+  }
+
   // game.js
   var platform = new PlatformAdapter();
   var canvas = $("game");
@@ -392,6 +410,7 @@
   var challenge = null;
   var shopTab = "skins";
   var frame = 0;
+  var pausedFrom = "playing";
   var today = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   function persist() {
     platform.set("sling-heist-v1", JSON.stringify(save));
@@ -490,24 +509,40 @@
       platform.banner(true);
     }, 5e3);
   }
+  var quipTimer;
+  var lastQuipAt = -Infinity;
+  function showQuip(kind, { hold = false, force = false } = {}) {
+    if (save.clean) return;
+    const now = performance.now();
+    if (!force && now - lastQuipAt < 6e3) return;
+    lastQuipAt = now;
+    clearTimeout(quipTimer);
+    $("quip").textContent = chooseDialogue(kind);
+    show("quip");
+    if (!hold) quipTimer = setTimeout(() => show("quip", false), 3500);
+  }
+  function clearQuip() {
+    clearTimeout(quipTimer);
+    show("quip", false);
+  }
   function setup(seed, mode = "normal", ghost = null) {
     clearTimeout(bannerTimer);
     const rng = mulberry32(seed);
     const runSkin = trial ?? save.skin;
     trial = null;
-    run = { seed, mode, rng, ghost, skin: runSkin, ghostTime: 0, p: { x: 100, y: 390, px: 94, py: 390 }, camera: 0, floor: 720, time: 0, distance: 0, coins: 0, paidCoins: 0, score: 0, combo: 0, perfects: 0, perfectChain: 0, rope: null, anchors: [], hazards: [], loot: [], chunks: 0, holdBuffer: 0, aim: { target: null, remaining: 0 }, physicsDt: CONFIG.STEP, invuln: 0, swingCount: 0, path: [], sample: 0, deathPath: [], deathTime: 0, revived: false, safe: { x: 100, y: 390 }, near: 0, slow: 0, flash: 0, hitstop: 0, adChoice: false, doubled: false };
+    run = { seed, mode, rng, ghost, started: false, skin: runSkin, ghostTime: 0, p: { x: 100, y: 390, px: 100 - CONFIG.START_SPEED * CONFIG.STEP, py: 390 }, camera: 0, floor: 720, time: 0, distance: 0, coins: 0, paidCoins: 0, score: 0, combo: 0, perfects: 0, perfectChain: 0, rope: null, anchors: [], hazards: [], loot: [], chunks: 0, holdBuffer: 0, aim: { target: null, remaining: 0 }, physicsDt: CONFIG.STEP, invuln: 0, swingCount: 0, path: [], sample: 0, deathPath: [], deathTime: 0, revived: false, safe: { x: 100, y: 390 }, near: 0, slow: 0, flash: 0, hitstop: 0, adChoice: false, doubled: false };
     for (let i = 0; i < 8; i++) chunk();
-    state = "playing";
+    state = "ready";
     input = false;
     show("menu", false);
     show("overlay", false);
     show("hud");
     $("hud").classList.toggle("clean", save.clean);
-    show("hint", save.runs === 0);
+    $("hint").innerHTML = "HOLD TO START &amp; GRAPPLE <span>\u2022</span> RELEASE TO FLY";
+    show("hint");
     show("footer", false);
     platform.banner(false);
-    platform.start();
-    platform.event("run_start", { seed, mode });
+    showQuip("ready", { hold: true, force: true });
     if (mode === "daily") platform.event("daily_start", { seed });
     sound(310, 0.09);
   }
@@ -550,6 +585,7 @@
       checkMissions();
       run.flash = 0.35;
       toast("PERFECT!");
+      showQuip("perfect");
       sound(760, 0.15, "triangle");
       if (run.perfectChain >= 10 && !save.firstChain) {
         save.firstChain = true;
@@ -562,7 +598,18 @@
     sound(230, 0.07, "triangle");
   }
   function down() {
-    if (state !== "playing" || input) return;
+    if (state !== "playing" && state !== "ready" || input) return;
+    if (state === "ready") {
+      state = "playing";
+      clearQuip();
+      platform.start();
+      if (!run.started) {
+        run.started = true;
+        platform.event("run_start", { seed: run.seed, mode: run.mode });
+      }
+      $("hint").innerHTML = "HOLD TO GRAPPLE <span>\u2022</span> RELEASE TO FLY";
+      if (save.runs > 0) show("hint", false);
+    }
     input = true;
     run.holdBuffer = CONFIG.BUFFER;
     attach();
@@ -576,7 +623,7 @@
     }
   }
   canvas.addEventListener("pointerdown", (e) => {
-    if (state === "playing") {
+    if (state === "playing" || state === "ready") {
       e.preventDefault();
       canvas.setPointerCapture(e.pointerId);
       down();
@@ -585,11 +632,11 @@
   canvas.addEventListener("pointerup", up);
   canvas.addEventListener("pointercancel", up);
   window.addEventListener("keydown", (e) => {
-    if (e.code === save.key && !e.repeat && state === "playing") {
+    if (e.code === save.key && !e.repeat && (state === "playing" || state === "ready")) {
       e.preventDefault();
       down();
     }
-    if (e.code === "Escape" && state === "playing") pause();
+    if (e.code === "Escape" && (state === "playing" || state === "ready")) pause();
   });
   window.addEventListener("keyup", (e) => {
     if (e.code === save.key) up();
@@ -624,6 +671,7 @@
       r.hitstop -= realDt;
       return;
     }
+    dt *= CONFIG.TIME_SCALE;
     if (r.slow > 0) {
       r.slow = Math.max(0, r.slow - realDt);
       dt *= 0.35;
@@ -665,6 +713,7 @@
         r.near += 50;
         r.slow = 0.08;
         toast("CLOSE CALL +50");
+        showQuip("near");
         sound(900, 0.1);
       }
     }
@@ -685,6 +734,8 @@
   }
   function die(cause) {
     let r = run;
+    clearQuip();
+    show("hint", false);
     state = "dead";
     platform.stop();
     r.deathPath = r.path.slice(-50);
@@ -713,7 +764,7 @@
     let offer = !r.revived && !sessionRevive && canReward();
     r.adChoice = offer;
     let revive = !r.revived;
-    panel(`<span class="kicker">${record ? "\u2726 NEW PERSONAL BEST" : "THE GETAWAY ENDS HERE"}</span><h2>${record ? "NICE HAUL." : "SO CLOSE!"}</h2><p>${escapeHTML(cause.toUpperCase())} GOT YOU. THE VAULT ISN'T GOING ANYWHERE.</p><div class="stats"><div><span>DISTANCE</span><b>${r.distance} M</b></div><div><span>LOOT</span><b>\u25CF ${r.coins}</b></div><div><span>SCORE</span><b>${r.score}</b></div></div><div class="buttons"><button id="retry">\u21BB &nbsp; RETRY</button>${revive ? `<button id="coinRevive">REVIVE \xB7 150 COINS</button>` : ""}${offer ? '<button id="adRevive">\u25B6 AD \xB7 REVIVE</button>' : ""}${canReward() ? '<button id="double">\u25B6 AD \xB7 2\xD7 COINS</button>' : ""}<button id="share">\u2193 SHARE CARD</button><button id="challenge">\u2197 CHALLENGE A FRIEND</button><button id="home">MAIN MENU</button></div><p class="small">${offer ? "Revive or retry \u2014 your choice. Ads are optional." : "Keep your loot. Try another run."}</p>`);
+    panel(`<span class="kicker">${record ? "\u2726 NEW PERSONAL BEST" : "THE GETAWAY ENDS HERE"}</span><h2>${record ? "NICE HAUL." : "SO CLOSE!"}</h2><p>${escapeHTML(cause.toUpperCase())} GOT US. ${escapeHTML(chooseDialogue("death"))}</p><div class="stats"><div><span>DISTANCE</span><b>${r.distance} M</b></div><div><span>LOOT</span><b>\u25CF ${r.coins}</b></div><div><span>SCORE</span><b>${r.score}</b></div></div><div class="buttons"><button id="retry">\u21BB &nbsp; RETRY</button>${revive ? `<button id="coinRevive">REVIVE \xB7 150 COINS</button>` : ""}${offer ? '<button id="adRevive">\u25B6 AD \xB7 REVIVE</button>' : ""}${canReward() ? '<button id="double">\u25B6 AD \xB7 2\xD7 COINS</button>' : ""}<button id="share">\u2193 SHARE CARD</button><button id="challenge">\u2197 CHALLENGE A FRIEND</button><button id="home">MAIN MENU</button></div><p class="small">${offer ? "Revive or retry \u2014 your choice. Ads are optional." : "Keep your loot. Try another run."}</p>`);
     $("retry").onclick = async () => {
       let seed = r.mode === "challenge" ? r.seed : Math.random() * 4294967296 >>> 0, mode = r.mode === "challenge" ? "challenge" : "normal";
       show("overlay", false);
@@ -779,13 +830,17 @@
     r.rope = null;
     r.aim = { target: null, remaining: 0 };
     r.physicsDt = CONFIG.STEP;
-    state = "playing";
+    state = "ready";
+    input = false;
     show("overlay", false);
     show("hud");
     $("hud").classList.toggle("clean", save.clean);
-    platform.start();
+    $("hint").innerHTML = "HOLD TO CONTINUE &amp; GRAPPLE <span>\u2022</span> RELEASE TO FLY";
+    show("hint");
+    showQuip("ready", { hold: true, force: true });
   }
   function menu() {
+    clearQuip();
     state = "menu";
     scheduleBanner();
     input = false;
@@ -797,20 +852,26 @@
     show("footer");
     persist();
   }
-  function pause() {
-    if (state !== "playing") return;
-    state = "paused";
-    input = false;
-    release();
-    platform.stop();
+  function pausePanel() {
     panel('<span class="kicker">TAKE A BREATHER</span><h2>PAUSED.</h2><p>The vault can wait. Your loot is safe.</p><div class="buttons"><button id="resume">RESUME HEIST</button><button id="quit">MAIN MENU</button></div>');
     $("resume").onclick = resume;
     $("quit").onclick = menu;
   }
+  function pause() {
+    if (state !== "playing" && state !== "ready") return;
+    pausedFrom = state;
+    if (state === "playing") release();
+    input = false;
+    state = "paused";
+    clearQuip();
+    platform.stop();
+    pausePanel();
+  }
   function resume() {
-    state = "playing";
+    state = pausedFrom;
     show("overlay", false);
-    platform.start();
+    if (state === "playing") platform.start();
+    else showQuip("ready", { hold: true, force: true });
   }
   function daily() {
     if (save.dailyDate !== today()) {
@@ -889,19 +950,16 @@
     });
   }
   var trial = null;
-  function settings() {
+  function settings(old = state) {
     clearTimeout(bannerTimer);
     platform.banner(false);
-    let old = state;
-    if (state === "playing") pause();
+    if (state === "playing" || state === "ready") pause();
     panel(`<button class="close" id="close">\xD7</button><span class="kicker">MAKE IT YOURS</span><h2>SETTINGS.</h2><div class="settings-row">Sound <button id="soundSetting">${save.muted ? "OFF" : "ON"}</button></div><div class="settings-row">Reduced motion <button id="motion">${save.reduced ? "ON" : "OFF"}</button></div><div class="settings-row">Clean mode (no HUD) <button id="clean">${save.clean ? "ON" : "OFF"}</button></div><div class="settings-row">Grapple key <button id="key">${escapeHTML(save.key)}</button></div><p>Click the key button, then press your preferred key. Mouse and touch always work.</p><div class="buttons"><button id="done">DONE</button></div>`);
     let back = () => {
       persist();
-      if (old === "playing" || old === "paused") {
+      if (old === "playing" || old === "ready" || old === "paused") {
         state = "paused";
-        panel('<span class="kicker">TAKE A BREATHER</span><h2>PAUSED.</h2><div class="buttons"><button id="resume">RESUME HEIST</button><button id="quit">MAIN MENU</button></div>');
-        $("resume").onclick = resume;
-        $("quit").onclick = menu;
+        pausePanel();
       } else menu();
     };
     $("close").onclick = back;
@@ -909,22 +967,23 @@
     $("soundSetting").onclick = () => {
       save.muted = !save.muted;
       syncAudio();
-      settings();
+      settings(old);
     };
     $("motion").onclick = () => {
       save.reduced = !save.reduced;
-      settings();
+      settings(old);
     };
     $("clean").onclick = () => {
       save.clean = !save.clean;
-      settings();
+      $("hud").classList.toggle("clean", save.clean);
+      settings(old);
     };
     $("key").onclick = () => {
       $("key").textContent = "PRESS A KEY";
       window.addEventListener("keydown", function set(e) {
         e.preventDefault();
         if (e.code !== "Escape") save.key = e.code;
-        settings();
+        settings(old);
       }, { once: true });
     };
   }
@@ -981,7 +1040,7 @@
     syncAudio();
     persist();
   };
-  $("settingsBtn").onclick = settings;
+  $("settingsBtn").onclick = () => settings();
   $("saveBtn").onclick = async () => {
     let user = await platform.auth();
     if (user) {
@@ -1023,39 +1082,59 @@
     ctx.fill();
   }
   function drawThief(x, y, scale = 1, alpha = 1) {
+    const active = (state === "playing" || state === "ready" || state === "paused" || state === "dead") && run;
+    const color = SKINS[active ? run.skin : save.skin]?.[2] || "#efc55d", bag = BAGS[save.bag]?.[2] || "#b78d5c";
+    const motion = save.reduced ? 0 : Math.sin(frame * 0.08), swinging = active && !!run.rope;
     ctx.save();
-    ctx.translate(x, y);
+    ctx.translate(x, y + (state === "ready" ? motion * 1.5 : 0));
     ctx.scale(scale, scale);
     ctx.globalAlpha = alpha;
-    let color = SKINS[(state === "playing" || state === "paused" || state === "dead") && run ? run.skin : save.skin]?.[2] || "#efc55d", bag = BAGS[save.bag]?.[2] || "#b78d5c";
+    if (swinging && !save.reduced) ctx.rotate(Math.max(-0.35, Math.min(0.35, (run.p.x - run.p.px) * 0.035)));
     ctx.save();
     ctx.rotate(-0.22);
-    roundRect(-30, -1, 35, 30, 8, bag);
+    roundRect(-32, -2, 35, 31, 8, bag);
     ctx.fillStyle = "#604c37";
-    ctx.fillRect(-25, 8, 24, 3);
+    ctx.fillRect(-27, 8, 24, 3);
+    circle(-15, 15, 3, "#e9ce8a");
     ctx.restore();
-    line(-4, 12, -17, 32, "#111e22", 10);
-    line(6, 12, 19, 29, "#111e22", 10);
-    line(-17, 32, -26, 32, "#0b1518", 8);
-    line(19, 29, 27, 24, "#0b1518", 8);
-    roundRect(-14, -18, 28, 36, 9, "#263b3b");
-    ctx.fillStyle = color;
-    ctx.fillRect(-12, -10, 24, 5);
-    line(-10, -6, -23, 4, "#263b3b", 8);
-    line(10, -6, 20, -19, "#263b3b", 8);
-    circle(-24, 5, 4, "#dfb78a");
-    circle(21, -20, 4, "#dfb78a");
-    circle(0, -25, 16, "#ddb890");
-    roundRect(-16, -31, 32, 12, 5, "#142226");
-    circle(-6, -25, 2, "#f6f0d9");
-    circle(6, -25, 2, "#f6f0d9");
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(-10, -38);
-    ctx.lineTo(7, -43);
-    ctx.lineTo(16, -31);
-    ctx.lineTo(-15, -31);
+    ctx.moveTo(-9, -15);
+    ctx.lineTo(-30, -11 - motion * 2);
+    ctx.lineTo(-26, -5 - motion * 2);
+    ctx.lineTo(-8, -8);
     ctx.fill();
+    const kick = swinging ? motion * 5 : 0;
+    line(-5, 12, -16 - kick, 29, "#111e22", 10);
+    line(6, 12, 17 + kick, 27, "#111e22", 10);
+    line(-16 - kick, 29, -25 - kick, 31, "#0b1518", 8);
+    line(17 + kick, 27, 25 + kick, 23, "#0b1518", 8);
+    roundRect(-14, -18, 28, 36, 9, "#263b3b");
+    ctx.fillStyle = color;
+    ctx.fillRect(-12, -12, 24, 5);
+    ctx.fillStyle = "#75877c";
+    ctx.fillRect(-2, -5, 3, 13);
+    line(-10, -6, -23, 4 + motion, "#263b3b", 8);
+    line(10, -6, 20, swinging ? -24 : -17, "#263b3b", 8);
+    circle(-24, 5 + motion, 4, "#dfb78a");
+    circle(21, swinging ? -25 : -18, 4, "#dfb78a");
+    circle(0, -25, 16, "#ddb890");
+    roundRect(-16, -32, 32, 13, 5, "#142226");
+    circle(-6, -25, 2.4, "#f6f0d9");
+    circle(6, -25, 2.4, "#f6f0d9");
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-13, -37);
+    ctx.lineTo(5, -43);
+    ctx.lineTo(16, -31);
+    ctx.lineTo(-16, -31);
+    ctx.fill();
+    ctx.strokeStyle = "#f9e2a1";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-10, -34);
+    ctx.lineTo(10, -34);
+    ctx.stroke();
     ctx.restore();
   }
   function backdrop(w, h) {
@@ -1110,7 +1189,7 @@
       circle(a.x, a.y, 7, "#e5bd59");
       circle(a.x, a.y, 3, "#f8e8ad");
     }
-    let aim = state === "playing" ? nearest() : null;
+    let aim = state === "playing" || state === "ready" ? nearest() : null;
     if (aim && !run.rope) {
       ctx.strokeStyle = "#d8eed0aa";
       ctx.lineWidth = 2;

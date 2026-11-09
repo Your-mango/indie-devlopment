@@ -3,3 +3,5 @@
 
 /* Clean mode preserves a visible pause control for touch players. */
 .hud.clean .hud-stat,.hud.clean .combo{display:none}.hud.clean #pauseBtn{margin-left:auto}
+
+.character-quip{position:absolute;z-index:3;left:50%;bottom:22%;transform:translateX(-50%);max-width:min(420px,88vw);padding:10px 16px;border:1px solid #9aa99a;border-radius:12px 12px 12px 2px;background:#f2ead3;color:#243b38;box-shadow:0 6px 20px #0005;font-size:12px;line-height:1.35;font-weight:700;text-align:center;pointer-events:none}.character-quip::before{content:'THE THIEF';display:block;color:#936b30;font-size:8px;letter-spacing:1.3px;margin-bottom:3px}@media(max-width:700px){.character-quip{bottom:22%;font-size:11px}.game-hint{max-width:95vw;font-size:9px;letter-spacing:.7px}}

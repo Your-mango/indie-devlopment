@@ -13,6 +13,7 @@ Open `sling-heist-local.html` directly in a browser—no server or internet is n
 - `scripts/build-local.mjs`: creates the local HTML from the source files.
 - `game.js`: fixed-step game loop, seeded chunks, rendering, controls and progression.
 - `physics.js`: testable aim/grace, rope movement, release and swept hazard collision functions.
+- `dialogue.js`: original contextual fourth-wall remarks for the thief.
 - `platform.js`: CrazyGames v3 boundary and local fallback; portal subclasses are starting points, not working integrations for those portals.
 - `config.js`: tuning constants and cosmetic catalog.
 - `ui.js`: reusable UI and PNG share card.
@@ -20,7 +21,7 @@ Open `sling-heist-local.html` directly in a browser—no server or internet is n
 
 ## Tuning reference
 
-All central physics and economy constants are in `config.js`: gravity 1800 px/s²; drag 0.995/frame; grapple reach 450 px; cone ±60°; reel 0.995/frame; perfect window 20–70°; input buffer 100ms; coyote 90ms; chunks 320px; alarm 120 + 18√distance px/s, cap 520 (currently scaled vertically by `FLOOR_VERTICAL_FACTOR = 0.08` to accommodate the side-scrolling view, so this is **not** yet the exact requested floor speed); hazard telegraph 0.6s; revive 150 coins; invulnerability 2s; daily par 640m; reward cooldown 3 minutes. The catalog lists the cosmetic prices and colors.
+All central physics and economy constants are in `config.js`: prototype gravity 1100 px/s²; overall simulation speed 0.72×; starting speed 260 px/s; drag 0.995/frame; grapple reach 450 px; cone ±60°; reel 0.995/frame; perfect window 20–70°; input buffer 100ms; coyote 90ms; chunks 320px; alarm 120 + 18√distance px/s, cap 520 (currently scaled vertically by `FLOOR_VERTICAL_FACTOR = 0.08` to accommodate the side-scrolling view, so this is **not** yet the exact requested floor speed); hazard telegraph 0.6s; revive 150 coins; invulnerability 2s; daily par 640m; reward cooldown 3 minutes. The catalog lists the cosmetic prices and colors.
 
 ## CrazyGames submission QA
 
@@ -57,4 +58,4 @@ Integration was checked against the CrazyGames [game](https://docs.crazygames.co
 
 ## Known gaps before production
 
-This is a playable prototype, not a submission-ready implementation of the complete brief. In particular, UI text is currently English only; the generated sections do not yet implement all twelve requested hand-authored obstacle templates, falling platforms or one-way lasers, nor is solvability formally verified. Coyote time now remembers the last valid anchor for 90 ms after it leaves the aim cone, provided it remains ahead and within reach; its feel still needs human playtesting. The intended music, full particle/shake/hit-stop treatment, contextual three-step tutorial, and full slow-motion high-score presentation are not complete. Run length, difficulty and coin economy need actual playtesting and tuning. Ghost links contain up to the first 75 seconds at 10 Hz and are lossy. The other portal adapter classes are stubs only. Run `npm test` for physics unit tests and a mock-SDK smoke test. The smoke test uses a mock SDK and DOM; it is not a substitute for testing the real CrazyGames QA tool, adblock, browsers or 100 real consecutive runs.
+This is a playable prototype, not a submission-ready implementation of the complete brief. In particular, UI text is currently English only; the generated sections do not yet implement all twelve requested hand-authored obstacle templates, falling platforms or one-way lasers, nor is solvability formally verified. Coyote time now remembers the last valid anchor for 90 ms after it leaves the aim cone, provided it remains ahead and within reach; its feel still needs human playtesting. The intended music, full particle/shake/hit-stop treatment, contextual three-step tutorial, and full slow-motion high-score presentation are not complete. The new ready state waits for the player before starting or retrying; the slower prototype physics deliberately differ from the original brief after player feedback and need human playtesting. Run length, difficulty and coin economy need further tuning. Ghost links contain up to the first 75 seconds at 10 Hz and are lossy. The other portal adapter classes are stubs only. Run `npm test` for physics unit tests and a mock-SDK smoke test. The smoke test uses a mock SDK and DOM; it is not a substitute for testing the real CrazyGames QA tool, adblock, browsers or 100 real consecutive runs.

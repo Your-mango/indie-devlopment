@@ -8,7 +8,17 @@ globalThis.location={href:'https://example.test/',search:''};globalThis.localSto
 let next;globalThis.requestAnimationFrame=fn=>{next=fn};
 let starts=0,stops=0;window.CrazyGames={SDK:{init:async()=>{},game:{settings:{},loadingStart(){},loadingStop(){},gameplayStart(){starts++},gameplayStop(){stops++},addSettingsChangeListener(){},getInviteParam(){return null}},ad:{hasAdblock:async()=>true},data:{getItem:()=>null,setItem(){}},user:{isUserAccountAvailable:false},banner:{clearAllBanners(){}}}};
 await import('../game.js');await new Promise(r=>setTimeout(r,0));
-assert.equal(typeof element('play').onclick,'function');element('play').click();assert.equal(starts,1,'starts gameplay');
-for(let i=0;i<200;i++){next(i*16.667);if(i===2)events['game:pointerdown'][0]({preventDefault(){},pointerId:1});if(i===28)events['game:pointerup'][0]();}
-assert.ok(stops>=1,'a run reaches game over');assert.equal(typeof element('retry').onclick,'function');element('home').click();assert.equal(typeof element('missionsBtn').onclick,'function');element('missionsBtn').click();assert.match(element('panel').innerHTML,/MISSIONS/);
-console.log('Smoke test passed: boot, gameplay, input, death and missions.');
+assert.equal(typeof element('play').onclick,'function');element('play').click();
+assert.equal(starts,0,'gameplay waits for the player');
+for(let i=0;i<600;i++)next(i*16.667);
+assert.equal(starts,0,'waiting on the ready screen does not start gameplay');
+assert.equal(stops,0,'waiting on the ready screen cannot kill the player');
+events['game:pointerdown'][0]({preventDefault(){},pointerId:1});assert.equal(starts,1,'first input starts gameplay');
+for(let i=600;i<1500;i++){next(i*16.667);if(i===650)events['game:pointerup'][0]();}
+assert.ok(stops>=1,'a run reaches game over');assert.equal(typeof element('retry').onclick,'function');
+await element('retry').onclick();assert.equal(starts,1,'retry does not start gameplay without input');
+for(let i=1500;i<2100;i++)next(i*16.667);
+assert.equal(starts,1,'retry remains ready even after waiting');
+events['game:pointerdown'][0]({preventDefault(){},pointerId:1});assert.equal(starts,2,'retry starts on input');
+element('pauseBtn').click();element('quit').click();assert.equal(typeof element('missionsBtn').onclick,'function');element('missionsBtn').click();assert.match(element('panel').innerHTML,/MISSIONS/);
+console.log('Smoke test passed: safe ready screen, gameplay, input, death and missions.');
