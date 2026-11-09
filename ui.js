@@ -1,0 +1,6 @@
+export const $=id=>document.getElementById(id);
+export function show(id,yes=true){$(id).classList.toggle('hidden',!yes)}
+export function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+export function panel(html){$('panel').innerHTML=html;show('overlay');}
+export function toast(text){const el=$('toast');el.textContent=text;show('toast');clearTimeout(toast.timer);toast.timer=setTimeout(()=>show('toast',false),1200);}
+export function downloadCard(distance,coins,skin,seed){const c=document.createElement('canvas');c.width=1280;c.height=720;const x=c.getContext('2d');x.fillStyle='#0b2426';x.fillRect(0,0,1280,720);x.strokeStyle='#d1ac52';x.lineWidth=3;x.strokeRect(35,35,1210,650);x.fillStyle='#e9c761';x.font='bold 36px sans-serif';x.fillText('◆  SLING HEIST',90,110);x.fillStyle='#f5f4e8';x.font='900 120px sans-serif';x.fillText(`${distance} M`,90,330);x.fillStyle='#b2c5b9';x.font='bold 30px sans-serif';x.fillText(`LOOT ${coins}    •    ${skin.toUpperCase()}    •    SEED ${seed}`,95,400);x.fillStyle='#e9c761';x.font='bold 38px sans-serif';x.fillText('THINK YOU CAN BEAT ME?',95,580);const a=document.createElement('a');a.download='sling-heist-score.png';a.href=c.toDataURL('image/png');a.click();}
