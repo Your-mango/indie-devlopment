@@ -4,6 +4,7 @@ import {$,show,panel,toast,escapeHTML,downloadCard} from './ui.js';
 import {selectAnchor,updateAimGrace,grappleTarget,integratePlayer,releaseVelocity,hazardProximity} from './physics.js';
 import {chooseDialogue} from './dialogue.js';
 import {backgroundTiles,decorativeOffset} from './background.js';
+import {snapshotRenderState,interpolatedRenderState} from './rendering.js';
 
 const platform=new PlatformAdapter(), canvas=$('game'), ctx=canvas.getContext('2d');
 const bg=new Image();bg.src='assets/vault-bg.jpg';
@@ -31,7 +32,7 @@ function showQuip(kind,{hold=false,force=false}={}){
 function clearQuip(){clearTimeout(quipTimer);show('quip',false);}
 function setup(seed,mode='normal',ghost=null){
  clearTimeout(bannerTimer);
- const rng=mulberry32(seed);const runSkin=trial??save.skin;trial=null;run={seed,mode,rng,ghost,started:false,skin:runSkin,ghostTime:0,p:{x:100,y:390,px:100-C.START_SPEED*C.STEP,py:390},camera:0,floor:720,time:0,distance:0,coins:0,paidCoins:0,score:0,combo:0,perfects:0,perfectChain:0,rope:null,anchors:[],hazards:[],loot:[],chunks:0,holdBuffer:0,aim:{target:null,remaining:0},physicsDt:C.STEP,invuln:0,swingCount:0,path:[],sample:0,deathPath:[],deathTime:0,revived:false,safe:{x:100,y:390},near:0,slow:0,flash:0,hitstop:0,adChoice:false,doubled:false};
+ const rng=mulberry32(seed);const runSkin=trial??save.skin;trial=null;run={seed,mode,rng,ghost,started:false,skin:runSkin,ghostTime:0,p:{x:100,y:390,px:100-C.START_SPEED*C.STEP,py:390},camera:0,floor:720,time:0,renderPrevious:{x:100,y:390,camera:0,floor:720,time:0},distance:0,coins:0,paidCoins:0,score:0,combo:0,perfects:0,perfectChain:0,rope:null,anchors:[],hazards:[],loot:[],chunks:0,holdBuffer:0,aim:{target:null,remaining:0},physicsDt:C.STEP,invuln:0,swingCount:0,path:[],sample:0,deathPath:[],deathTime:0,revived:false,safe:{x:100,y:390},near:0,slow:0,flash:0,hitstop:0,adChoice:false,doubled:false};
  for(let i=0;i<8;i++)chunk();state='ready';$('app').classList.add('in-run');input=false;show('menu',false);show('overlay',false);show('hud');$('hud').classList.toggle('clean',save.clean);$('hint').innerHTML='HOLD TO START &amp; GRAPPLE <span>•</span> RELEASE TO FLY';show('hint');show('footer',false);platform.banner(false);showQuip('ready',{hold:true,force:true});if(mode==='daily')platform.event('daily_start',{seed});sound(310,.09);}
 function chunk(){let i=run.chunks++,x=300+i*C.CHUNK, r=run.rng, template=Math.floor(r()*12), y=150+r()*100; // Every anchor spacing is 320 < 85% of reach.
  run.anchors.push({x,y,baseY:y,moving:i>=10&&template%4===0,phase:r()*6.28});
@@ -47,7 +48,7 @@ window.addEventListener('keydown',e=>{if(e.code===save.key&&!e.repeat&&(state===
 function checkMissions(){if(!Array.isArray(save.missionClaimed))save.missionClaimed=[];for(const [id,done] of [['swings',save.missionSwings>=30],['distance',save.missionDistance>=800],['perfects',save.missionPerfects>=3]])if(done&&!save.missionClaimed.includes(id)){save.missionClaimed.push(id);save.coins+=100;toast('MISSION COMPLETE · +100 COINS');persist();}}
 function missions(){clearTimeout(bannerTimer);platform.banner(false);platform.stop();panel(`<button class="close" id="close">×</button><span class="kicker">RESETS DAILY · 00:00 UTC</span><h2>MISSIONS.</h2><p>Complete a job for 100 coins each.</p><div class="settings-row">Swing 30 times <b>${Math.min(30,save.missionSwings||0)} / 30</b></div><div class="settings-row">Reach 800 m <b>${Math.min(800,save.missionDistance||0)} / 800</b></div><div class="settings-row">Get 3 perfect releases <b>${Math.min(3,save.missionPerfects||0)} / 3</b></div><p>Daily streak: day ${save.streak} / 7</p><div class="buttons"><button id="back">BACK</button></div>`);$('close').onclick=menu;$('back').onclick=menu;}
 function multiplier(){return run.combo>=20?5:run.combo>=10?3:run.combo>=5?2:1;}
-function update(dt){if(state!=='playing'||!run||adPlaying)return;let r=run,p=r.p;const realDt=dt,previousTime=r.time;r.invuln=Math.max(0,r.invuln-realDt);r.flash=Math.max(0,r.flash-realDt);if(r.hitstop>0){r.hitstop-=realDt;return;}dt*=C.TIME_SCALE;if(r.slow>0){r.slow=Math.max(0,r.slow-realDt);dt*=.35;}r.time+=dt;updateAimGrace(r.aim,p,r.anchors,realDt,r.physicsDt);
+function update(dt){if(state!=='playing'||!run||adPlaying)return;let r=run,p=r.p;snapshotRenderState(r);const realDt=dt,previousTime=r.time;r.invuln=Math.max(0,r.invuln-realDt);r.flash=Math.max(0,r.flash-realDt);if(r.hitstop>0){r.hitstop-=realDt;return;}dt*=C.TIME_SCALE;if(r.slow>0){r.slow=Math.max(0,r.slow-realDt);dt*=.35;}r.time+=dt;updateAimGrace(r.aim,p,r.anchors,realDt,r.physicsDt);
  if(input&&!r.rope&&r.holdBuffer>0)attach();r.holdBuffer=Math.max(0,r.holdBuffer-realDt);for(const a of r.anchors)if(a.moving)a.y=a.baseY+Math.sin(r.time*1.4+a.phase)*50;
  const from={x:p.x,y:p.y};integratePlayer(p,r.rope,dt,r.physicsDt);r.physicsDt=dt;
  r.distance=Math.max(r.distance,Math.floor(Math.max(0,p.x-100)/C.PIXELS_PER_METER));save.missionDistance=Math.max(save.missionDistance,r.distance);checkMissions();const viewportWidth=canvas.width/(canvas.height/C.HEIGHT);r.camera=Math.max(r.camera,p.x-Math.min(350,viewportWidth*.34));r.floor-=Math.min(C.FLOOR_CAP,C.FLOOR_BASE+C.FLOOR_SCALE*Math.sqrt(r.distance))*dt*C.FLOOR_VERTICAL_FACTOR;
@@ -123,8 +124,10 @@ function backdrop(w,h,camera=0,time=0,reducedMotion=true){
  ctx.fillStyle='#0b2528';ctx.fillRect(0,0,w,h);
  if(bg.complete&&bg.naturalWidth){
    for(const tile of backgroundTiles(w,h,bg.naturalWidth,bg.naturalHeight,camera,time,reducedMotion)){
-     if(tile.mirror){ctx.save();ctx.translate(tile.x+tile.width,0);ctx.scale(-1,1);ctx.drawImage(bg,0,tile.y,tile.width,tile.height);ctx.restore();}
-     else ctx.drawImage(bg,tile.x,tile.y,tile.width,tile.height);
+     // A small overlap hides sub-pixel seams between tiles on high-DPI displays.
+     const overlap=1;
+     if(tile.mirror){ctx.save();ctx.translate(tile.x+tile.width+overlap,0);ctx.scale(-1,1);ctx.drawImage(bg,0,tile.y,tile.width+overlap*2,tile.height);ctx.restore();}
+     else ctx.drawImage(bg,tile.x-overlap,tile.y,tile.width+overlap*2,tile.height);
    }
  }
  ctx.fillStyle='rgba(2,17,19,.35)';ctx.fillRect(0,0,w,h);
@@ -142,16 +145,19 @@ function drawVaultDepth(w,h,camera,time,reducedMotion){
 }
 function renderMenu(w,h){backdrop(w,h);let x=w*.58,y=h*.53,s=Math.min(w/1280,h/720);ctx.save();ctx.globalAlpha=.22;for(let i=0;i<5;i++){circle(x+(i-2)*70*s,y+130*s,2*s,'#e8c965');}ctx.restore();line(x+135*s,0,x+20*s,y-30*s,'#d5c6a1',3*s);circle(x+135*s,8*s,8*s,'#d5c6a1');drawThief(x,y,2.2*s); // scattered loot and vault accents
  for(let i=0;i<4;i++){let cx=x+(100+i*44)*s,cy=y+(130-Math.sin(i)*24)*s;circle(cx,cy,10*s,'#b38932');circle(cx-2*s,cy-2*s,7*s,'#f4cf67');ctx.fillStyle='#9f7928';ctx.font=`bold ${10*s}px sans-serif`;ctx.fillText('$',cx-5*s,cy+3*s);}}
-function renderGame(w,h){backdrop(w,h,run.camera,run.time,save.reduced);drawVaultDepth(w,h,run.camera,run.time,save.reduced);let scale=h/C.HEIGHT, vw=w/scale;ctx.save();ctx.scale(scale,scale);let cam=run.camera;ctx.translate(-cam,0);
+function renderGame(w,h,alpha=1){
+ const visual=interpolatedRenderState(run,alpha),cam=visual.camera,renderTime=visual.time;
+ backdrop(w,h,cam,renderTime,save.reduced);drawVaultDepth(w,h,cam,renderTime,save.reduced);
+ let scale=h/C.HEIGHT, vw=w/scale;ctx.save();ctx.scale(scale,scale);ctx.translate(-cam,0);
  // depth guides
  for(let x=Math.floor(cam/320)*320;x<cam+vw+320;x+=320){ctx.fillStyle='rgba(144,191,170,.035)';ctx.fillRect(x,0,2,720);ctx.strokeStyle='rgba(135,176,157,.06)';ctx.strokeRect(x+25,80,270,500);}
- for(const a of run.anchors){if(a.x<cam-50||a.x>cam+vw+50)continue;line(a.x,0,a.x,a.y-12,'#50655d',3);circle(a.x,a.y,12,'#344d48');circle(a.x,a.y,7,'#e5bd59');circle(a.x,a.y,3,'#f8e8ad');}
- let aim=(state==='playing'||state==='ready')?nearest():null;if(aim&&!run.rope){ctx.strokeStyle='#d8eed0aa';ctx.lineWidth=2;ctx.beginPath();ctx.arc(aim.x,aim.y,19+Math.sin(frame/12)*3,0,Math.PI*2);ctx.stroke();}
+ for(const a of run.anchors){if(a.x<cam-50||a.x>cam+vw+50)continue;const y=a.moving?a.baseY+Math.sin(renderTime*1.4+a.phase)*50:a.y;line(a.x,0,a.x,y-12,'#50655d',3);circle(a.x,y,12,'#344d48');circle(a.x,y,7,'#e5bd59');circle(a.x,y,3,'#f8e8ad');}
+ let aim=(state==='playing'||state==='ready')?nearest():null;if(aim&&!run.rope){ctx.strokeStyle='#d8eed0aa';ctx.lineWidth=2;ctx.beginPath();ctx.arc(aim.x,aim.moving?aim.baseY+Math.sin(renderTime*1.4+aim.phase)*50:aim.y,19+Math.sin(frame/12)*3,0,Math.PI*2);ctx.stroke();}
  for(const l of run.loot){if(l.taken||l.x<cam-30||l.x>cam+vw+30)continue;ctx.save();ctx.shadowColor='#ffce57';ctx.shadowBlur=12;circle(l.x,l.y,10,l.value===10?'#77d7cc':'#f4ca5c');ctx.restore();circle(l.x,l.y,5,l.value===10?'#bafaf1':'#fff0a8');}
- for(const hz of run.hazards){if(hz.x<cam-120||hz.x>cam+vw+120)continue;let hy=hz.kind==='blade'?hz.y+Math.sin(run.time*2+hz.phase)*70:hz.y;ctx.save();ctx.globalAlpha=hz.age<C.TELEGRAPH?.4+.3*Math.sin(frame*.3):1;ctx.shadowColor='#fb6262';ctx.shadowBlur=12;if(hz.kind==='blade'){circle(hz.x,hy,25,'#e26b62');ctx.fillStyle='#ffd7be';for(let i=0;i<8;i++){let a=i*Math.PI/4+run.time*2;ctx.beginPath();ctx.moveTo(hz.x+Math.cos(a)*17,hy+Math.sin(a)*17);ctx.lineTo(hz.x+Math.cos(a+.2)*34,hy+Math.sin(a+.2)*34);ctx.lineTo(hz.x+Math.cos(a+.4)*17,hy+Math.sin(a+.4)*17);ctx.fill();}circle(hz.x,hy,7,'#293d3b');}else{let horizontal=hz.kind==='horizontal';line(hz.x-(horizontal?70:0),hy-(horizontal?0:90),hz.x+(horizontal?70:0),hy+(horizontal?0:90),'#ff5b60',5);for(let i=-1;i<=1;i+=2){let x=hz.x+(horizontal?i*70:0),y=hy+(horizontal?0:i*90);ctx.fillStyle='#ffb7a0';ctx.beginPath();ctx.moveTo(x,y-7);ctx.lineTo(x+7,y+7);ctx.lineTo(x-7,y+7);ctx.fill();}}ctx.restore();}
- let floor=run.floor;ctx.fillStyle='#c34d44';ctx.fillRect(cam,floor,vw,720-floor);ctx.fillStyle='#ff9671';ctx.fillRect(cam,floor,vw,4);ctx.fillStyle='rgba(255,188,133,.5)';for(let x=Math.floor(cam/75)*75;x<cam+vw;x+=75){ctx.beginPath();ctx.moveTo(x,floor+4);ctx.lineTo(x+20,floor+4);ctx.lineTo(x+8,floor+20);ctx.lineTo(x-12,floor+20);ctx.fill();}
- if(run.ghost&&run.ghost.length){let g=run.ghost[Math.min(run.ghost.length-1,Math.floor(run.time*10))];if(g)drawThief(g[0],g[1],.65,.3);}
- let p=run.p;if(state==='dead'&&run.deathPath.length){let index=Math.floor((run.deathTime*.5*10)%run.deathPath.length);let q=run.deathPath[index];if(q)p={x:q[0],y:q[1]};}
+ for(const hz of run.hazards){if(hz.x<cam-120||hz.x>cam+vw+120)continue;let hy=hz.kind==='blade'?hz.y+Math.sin(renderTime*2+hz.phase)*70:hz.y;ctx.save();ctx.globalAlpha=hz.age<C.TELEGRAPH?.4+.3*Math.sin(frame*.3):1;ctx.shadowColor='#fb6262';ctx.shadowBlur=12;if(hz.kind==='blade'){circle(hz.x,hy,25,'#e26b62');ctx.fillStyle='#ffd7be';for(let i=0;i<8;i++){let a=i*Math.PI/4+renderTime*2;ctx.beginPath();ctx.moveTo(hz.x+Math.cos(a)*17,hy+Math.sin(a)*17);ctx.lineTo(hz.x+Math.cos(a+.2)*34,hy+Math.sin(a+.2)*34);ctx.lineTo(hz.x+Math.cos(a+.4)*17,hy+Math.sin(a+.4)*17);ctx.fill();}circle(hz.x,hy,7,'#293d3b');}else{let horizontal=hz.kind==='horizontal';line(hz.x-(horizontal?70:0),hy-(horizontal?0:90),hz.x+(horizontal?70:0),hy+(horizontal?0:90),'#ff5b60',5);for(let i=-1;i<=1;i+=2){let x=hz.x+(horizontal?i*70:0),y=hy+(horizontal?0:i*90);ctx.fillStyle='#ffb7a0';ctx.beginPath();ctx.moveTo(x,y-7);ctx.lineTo(x+7,y+7);ctx.lineTo(x-7,y+7);ctx.fill();}}ctx.restore();}
+ let floor=visual.floor;ctx.fillStyle='#c34d44';ctx.fillRect(cam,floor,vw,720-floor);ctx.fillStyle='#ff9671';ctx.fillRect(cam,floor,vw,4);ctx.fillStyle='rgba(255,188,133,.5)';for(let x=Math.floor(cam/75)*75;x<cam+vw;x+=75){ctx.beginPath();ctx.moveTo(x,floor+4);ctx.lineTo(x+20,floor+4);ctx.lineTo(x+8,floor+20);ctx.lineTo(x-12,floor+20);ctx.fill();}
+ if(run.ghost&&run.ghost.length){let g=run.ghost[Math.min(run.ghost.length-1,Math.floor(renderTime*10))];if(g)drawThief(g[0],g[1],.65,.3);}
+ let p={x:visual.x,y:visual.y};if(state==='dead'&&run.deathPath.length){let index=Math.floor((run.deathTime*.5*10)%run.deathPath.length);let q=run.deathPath[index];if(q)p={x:q[0],y:q[1]};}
  if(run.rope){
    let handX=p.x,handY=p.y;
    if(run.skin===0&&raccoon.complete&&raccoon.naturalWidth){
@@ -159,9 +165,10 @@ function renderGame(w,h){backdrop(w,h,run.camera,run.time,save.reduced);drawVaul
      const ox=26*.8,oy=-19*.8;
      handX+=Math.cos(rotation)*ox-Math.sin(rotation)*oy;handY+=Math.sin(rotation)*ox+Math.cos(rotation)*oy;
    }
-   line(run.rope.anchor.x,run.rope.anchor.y,handX,handY,TRAILS[save.trail]?.[2]||'#dfc586',3);
+   const a=run.rope.anchor,anchorY=a.moving?a.baseY+Math.sin(renderTime*1.4+a.phase)*50:a.y;
+   line(a.x,anchorY,handX,handY,TRAILS[save.trail]?.[2]||'#dfc586',3);
  }
  if(run.invuln>0){ctx.strokeStyle='#b9f4cf';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y,28,0,Math.PI*2);ctx.stroke();}drawThief(p.x,p.y,.8);ctx.restore();if(run.flash>0&&!save.reduced){ctx.fillStyle=`rgba(151,255,150,${run.flash*.18})`;ctx.fillRect(0,0,w,h);}}
-function loop(t){let elapsed=Math.min((t-last)/1000,.05)||0;last=t;accumulator+=elapsed;while(accumulator>=C.STEP){update(C.STEP);accumulator-=C.STEP;}if(state==='dead'&&run)run.deathTime+=elapsed;frame++;let w=canvas.width,h=canvas.height;ctx.setTransform(1,0,0,1,0,0);if(state==='menu'||state==='shop'||!run)renderMenu(w,h);else renderGame(w,h);requestAnimationFrame(loop);}
+function loop(t){let elapsed=Math.min((t-last)/1000,.05)||0;last=t;accumulator+=elapsed;while(accumulator>=C.STEP){update(C.STEP);accumulator-=C.STEP;}if(state==='dead'&&run)run.deathTime+=elapsed;frame++;let w=canvas.width,h=canvas.height;ctx.setTransform(1,0,0,1,0,0);if(state==='menu'||state==='shop'||!run)renderMenu(w,h);else renderGame(w,h,state==='playing'?accumulator/C.STEP:1);requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
 (async()=>{await platform.init();load();platform.ready();if(state==='menu')scheduleBanner();syncAudio();const user=await platform.profile();if(user?.username)$('playerName').textContent=user.username;readChallenge();})();

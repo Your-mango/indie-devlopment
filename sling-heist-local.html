@@ -449,6 +449,28 @@
     return (distance % CONFIG.BACKGROUND_DETAIL_SPACING + CONFIG.BACKGROUND_DETAIL_SPACING) % CONFIG.BACKGROUND_DETAIL_SPACING;
   }
 
+  // rendering.js
+  function snapshotRenderState(run2) {
+    const previous = run2.renderPrevious;
+    previous.x = run2.p.x;
+    previous.y = run2.p.y;
+    previous.camera = run2.camera;
+    previous.time = run2.time;
+    previous.floor = run2.floor;
+  }
+  function interpolatedRenderState(run2, alpha = 1) {
+    const previous = run2.renderPrevious;
+    const t = Math.max(0, Math.min(1, Number.isFinite(alpha) ? alpha : 1));
+    const mix = (a, b) => a + (b - a) * t;
+    return {
+      x: mix(previous.x, run2.p.x),
+      y: mix(previous.y, run2.p.y),
+      camera: mix(previous.camera, run2.camera),
+      time: mix(previous.time, run2.time),
+      floor: mix(previous.floor, run2.floor)
+    };
+  }
+
   // game.js
   var platform = new PlatformAdapter();
   var canvas = $("game");
@@ -592,7 +614,7 @@
     const rng = mulberry32(seed);
     const runSkin = trial ?? save.skin;
     trial = null;
-    run = { seed, mode, rng, ghost, started: false, skin: runSkin, ghostTime: 0, p: { x: 100, y: 390, px: 100 - CONFIG.START_SPEED * CONFIG.STEP, py: 390 }, camera: 0, floor: 720, time: 0, distance: 0, coins: 0, paidCoins: 0, score: 0, combo: 0, perfects: 0, perfectChain: 0, rope: null, anchors: [], hazards: [], loot: [], chunks: 0, holdBuffer: 0, aim: { target: null, remaining: 0 }, physicsDt: CONFIG.STEP, invuln: 0, swingCount: 0, path: [], sample: 0, deathPath: [], deathTime: 0, revived: false, safe: { x: 100, y: 390 }, near: 0, slow: 0, flash: 0, hitstop: 0, adChoice: false, doubled: false };
+    run = { seed, mode, rng, ghost, started: false, skin: runSkin, ghostTime: 0, p: { x: 100, y: 390, px: 100 - CONFIG.START_SPEED * CONFIG.STEP, py: 390 }, camera: 0, floor: 720, time: 0, renderPrevious: { x: 100, y: 390, camera: 0, floor: 720, time: 0 }, distance: 0, coins: 0, paidCoins: 0, score: 0, combo: 0, perfects: 0, perfectChain: 0, rope: null, anchors: [], hazards: [], loot: [], chunks: 0, holdBuffer: 0, aim: { target: null, remaining: 0 }, physicsDt: CONFIG.STEP, invuln: 0, swingCount: 0, path: [], sample: 0, deathPath: [], deathTime: 0, revived: false, safe: { x: 100, y: 390 }, near: 0, slow: 0, flash: 0, hitstop: 0, adChoice: false, doubled: false };
     for (let i = 0; i < 8; i++) chunk();
     state = "ready";
     $("app").classList.add("in-run");
@@ -727,6 +749,7 @@
   function update(dt) {
     if (state !== "playing" || !run || adPlaying) return;
     let r = run, p = r.p;
+    snapshotRenderState(r);
     const realDt = dt, previousTime = r.time;
     r.invuln = Math.max(0, r.invuln - realDt);
     r.flash = Math.max(0, r.flash - realDt);
@@ -1217,13 +1240,14 @@
     ctx.fillRect(0, 0, w, h);
     if (bg.complete && bg.naturalWidth) {
       for (const tile of backgroundTiles(w, h, bg.naturalWidth, bg.naturalHeight, camera, time, reducedMotion)) {
+        const overlap = 1;
         if (tile.mirror) {
           ctx.save();
-          ctx.translate(tile.x + tile.width, 0);
+          ctx.translate(tile.x + tile.width + overlap, 0);
           ctx.scale(-1, 1);
-          ctx.drawImage(bg, 0, tile.y, tile.width, tile.height);
+          ctx.drawImage(bg, 0, tile.y, tile.width + overlap * 2, tile.height);
           ctx.restore();
-        } else ctx.drawImage(bg, tile.x, tile.y, tile.width, tile.height);
+        } else ctx.drawImage(bg, tile.x - overlap, tile.y, tile.width + overlap * 2, tile.height);
       }
     }
     ctx.fillStyle = "rgba(2,17,19,.35)";
@@ -1265,13 +1289,13 @@
       ctx.fillText("$", cx - 5 * s, cy + 3 * s);
     }
   }
-  function renderGame(w, h) {
-    backdrop(w, h, run.camera, run.time, save.reduced);
-    drawVaultDepth(w, h, run.camera, run.time, save.reduced);
+  function renderGame(w, h, alpha = 1) {
+    const visual = interpolatedRenderState(run, alpha), cam = visual.camera, renderTime = visual.time;
+    backdrop(w, h, cam, renderTime, save.reduced);
+    drawVaultDepth(w, h, cam, renderTime, save.reduced);
     let scale = h / CONFIG.HEIGHT, vw = w / scale;
     ctx.save();
     ctx.scale(scale, scale);
-    let cam = run.camera;
     ctx.translate(-cam, 0);
     for (let x = Math.floor(cam / 320) * 320; x < cam + vw + 320; x += 320) {
       ctx.fillStyle = "rgba(144,191,170,.035)";
@@ -1281,17 +1305,18 @@
     }
     for (const a of run.anchors) {
       if (a.x < cam - 50 || a.x > cam + vw + 50) continue;
-      line(a.x, 0, a.x, a.y - 12, "#50655d", 3);
-      circle(a.x, a.y, 12, "#344d48");
-      circle(a.x, a.y, 7, "#e5bd59");
-      circle(a.x, a.y, 3, "#f8e8ad");
+      const y = a.moving ? a.baseY + Math.sin(renderTime * 1.4 + a.phase) * 50 : a.y;
+      line(a.x, 0, a.x, y - 12, "#50655d", 3);
+      circle(a.x, y, 12, "#344d48");
+      circle(a.x, y, 7, "#e5bd59");
+      circle(a.x, y, 3, "#f8e8ad");
     }
     let aim = state === "playing" || state === "ready" ? nearest() : null;
     if (aim && !run.rope) {
       ctx.strokeStyle = "#d8eed0aa";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(aim.x, aim.y, 19 + Math.sin(frame / 12) * 3, 0, Math.PI * 2);
+      ctx.arc(aim.x, aim.moving ? aim.baseY + Math.sin(renderTime * 1.4 + aim.phase) * 50 : aim.y, 19 + Math.sin(frame / 12) * 3, 0, Math.PI * 2);
       ctx.stroke();
     }
     for (const l of run.loot) {
@@ -1305,7 +1330,7 @@
     }
     for (const hz of run.hazards) {
       if (hz.x < cam - 120 || hz.x > cam + vw + 120) continue;
-      let hy = hz.kind === "blade" ? hz.y + Math.sin(run.time * 2 + hz.phase) * 70 : hz.y;
+      let hy = hz.kind === "blade" ? hz.y + Math.sin(renderTime * 2 + hz.phase) * 70 : hz.y;
       ctx.save();
       ctx.globalAlpha = hz.age < CONFIG.TELEGRAPH ? 0.4 + 0.3 * Math.sin(frame * 0.3) : 1;
       ctx.shadowColor = "#fb6262";
@@ -1314,7 +1339,7 @@
         circle(hz.x, hy, 25, "#e26b62");
         ctx.fillStyle = "#ffd7be";
         for (let i = 0; i < 8; i++) {
-          let a = i * Math.PI / 4 + run.time * 2;
+          let a = i * Math.PI / 4 + renderTime * 2;
           ctx.beginPath();
           ctx.moveTo(hz.x + Math.cos(a) * 17, hy + Math.sin(a) * 17);
           ctx.lineTo(hz.x + Math.cos(a + 0.2) * 34, hy + Math.sin(a + 0.2) * 34);
@@ -1337,7 +1362,7 @@
       }
       ctx.restore();
     }
-    let floor = run.floor;
+    let floor = visual.floor;
     ctx.fillStyle = "#c34d44";
     ctx.fillRect(cam, floor, vw, 720 - floor);
     ctx.fillStyle = "#ff9671";
@@ -1352,10 +1377,10 @@
       ctx.fill();
     }
     if (run.ghost && run.ghost.length) {
-      let g = run.ghost[Math.min(run.ghost.length - 1, Math.floor(run.time * 10))];
+      let g = run.ghost[Math.min(run.ghost.length - 1, Math.floor(renderTime * 10))];
       if (g) drawThief(g[0], g[1], 0.65, 0.3);
     }
-    let p = run.p;
+    let p = { x: visual.x, y: visual.y };
     if (state === "dead" && run.deathPath.length) {
       let index = Math.floor(run.deathTime * 0.5 * 10 % run.deathPath.length);
       let q = run.deathPath[index];
@@ -1369,7 +1394,8 @@
         handX += Math.cos(rotation) * ox - Math.sin(rotation) * oy;
         handY += Math.sin(rotation) * ox + Math.cos(rotation) * oy;
       }
-      line(run.rope.anchor.x, run.rope.anchor.y, handX, handY, TRAILS[save.trail]?.[2] || "#dfc586", 3);
+      const a = run.rope.anchor, anchorY = a.moving ? a.baseY + Math.sin(renderTime * 1.4 + a.phase) * 50 : a.y;
+      line(a.x, anchorY, handX, handY, TRAILS[save.trail]?.[2] || "#dfc586", 3);
     }
     if (run.invuln > 0) {
       ctx.strokeStyle = "#b9f4cf";
@@ -1398,7 +1424,7 @@
     let w = canvas.width, h = canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (state === "menu" || state === "shop" || !run) renderMenu(w, h);
-    else renderGame(w, h);
+    else renderGame(w, h, state === "playing" ? accumulator / CONFIG.STEP : 1);
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);

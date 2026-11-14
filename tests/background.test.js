@@ -27,3 +27,17 @@ test('invalid image and viewport sizes produce no tiles',()=>{
  assert.deepEqual(backgroundTiles(0,720,1536,1024),[]);
  assert.deepEqual(backgroundTiles(1280,720,0,1024),[]);
 });
+
+test('mirrored image remains continuous as a tile boundary crosses the viewport',()=>{
+ const width=1280,height=720,iw=1536,ih=1024;
+ const sample=(camera,x)=>{
+  const tile=backgroundTiles(width,height,iw,ih,camera,0,false).find(t=>x>=t.x&&x<=t.x+t.width);
+  const u=(x-tile.x)/tile.width;
+  return tile.mirror?1-u:u;
+ };
+ // Follow the same screen pixel through several wrap boundaries.
+ for(let camera=0;camera<16000;camera+=5){
+  const before=sample(camera,0),after=sample(camera+.01,0);
+  assert.ok(Math.abs(after-before)<.001,`jump at camera ${camera}`);
+ }
+});

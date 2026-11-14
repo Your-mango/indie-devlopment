@@ -14,6 +14,7 @@ Open `sling-heist-local.html` directly in a browser—no server or internet is n
 - `game.js`: fixed-step game loop, seeded chunks, rendering, controls and progression.
 - `physics.js`: testable aim/grace, rope movement, release and swept hazard collision functions.
 - `background.js`: mirrored, looping vault backdrop and a second parallax layer; disabled by Reduced Motion.
+- `rendering.js`: interpolates player, camera and background positions between fixed physics steps to reduce visual stutter without changing gameplay physics.
 - `dialogue.js`: original contextual fourth-wall remarks for the thief.
 - `platform.js`: CrazyGames v3 boundary and local fallback; portal subclasses are starting points, not working integrations for those portals.
 - `config.js`: tuning constants and cosmetic catalog.
