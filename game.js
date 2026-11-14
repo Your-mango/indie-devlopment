@@ -3,6 +3,7 @@ import {PlatformAdapter} from './platform.js';
 import {$,show,panel,toast,escapeHTML,downloadCard} from './ui.js';
 import {selectAnchor,updateAimGrace,grappleTarget,integratePlayer,releaseVelocity,hazardProximity} from './physics.js';
 import {chooseDialogue} from './dialogue.js';
+import {backgroundTiles,decorativeOffset} from './background.js';
 
 const platform=new PlatformAdapter(), canvas=$('game'), ctx=canvas.getContext('2d');
 const bg=new Image();bg.src='assets/vault-bg.jpg';
@@ -118,10 +119,30 @@ function drawThief(x,y,scale=1,alpha=1){
  ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(-13,-37);ctx.lineTo(5,-43);ctx.lineTo(16,-31);ctx.lineTo(-16,-31);ctx.fill();
  ctx.strokeStyle='#f9e2a1';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-10,-34);ctx.lineTo(10,-34);ctx.stroke();ctx.restore();
 }
-function backdrop(w,h){ctx.fillStyle='#0b2528';ctx.fillRect(0,0,w,h);if(bg.complete&&bg.naturalWidth){let scale=Math.max(w/bg.width,h/bg.height);let sw=w/scale,sh=h/scale;ctx.drawImage(bg,(bg.width-sw)/2,(bg.height-sh)/2,sw,sh,0,0,w,h);}ctx.fillStyle='rgba(2,17,19,.35)';ctx.fillRect(0,0,w,h);}
+function backdrop(w,h,camera=0,time=0,reducedMotion=true){
+ ctx.fillStyle='#0b2528';ctx.fillRect(0,0,w,h);
+ if(bg.complete&&bg.naturalWidth){
+   for(const tile of backgroundTiles(w,h,bg.naturalWidth,bg.naturalHeight,camera,time,reducedMotion)){
+     if(tile.mirror){ctx.save();ctx.translate(tile.x+tile.width,0);ctx.scale(-1,1);ctx.drawImage(bg,0,tile.y,tile.width,tile.height);ctx.restore();}
+     else ctx.drawImage(bg,tile.x,tile.y,tile.width,tile.height);
+   }
+ }
+ ctx.fillStyle='rgba(2,17,19,.35)';ctx.fillRect(0,0,w,h);
+}
+function drawVaultDepth(w,h,camera,time,reducedMotion){
+ const scale=h/C.HEIGHT,width=w/scale,offset=decorativeOffset(camera,time,reducedMotion);
+ ctx.save();ctx.scale(scale,scale);
+ // Muted beams and warning lamps provide a second, faster-moving depth layer.
+ for(let x=-offset-C.BACKGROUND_DETAIL_SPACING;x<width+C.BACKGROUND_DETAIL_SPACING;x+=C.BACKGROUND_DETAIL_SPACING){
+   ctx.fillStyle='rgba(5,19,21,.18)';ctx.fillRect(x,0,16,C.HEIGHT);
+   ctx.fillStyle='rgba(150,195,178,.09)';ctx.fillRect(x+15,0,2,C.HEIGHT);
+   ctx.fillStyle='rgba(237,192,94,.12)';ctx.fillRect(x+5,95,5,18);ctx.fillRect(x+5,530,5,18);
+ }
+ ctx.restore();
+}
 function renderMenu(w,h){backdrop(w,h);let x=w*.58,y=h*.53,s=Math.min(w/1280,h/720);ctx.save();ctx.globalAlpha=.22;for(let i=0;i<5;i++){circle(x+(i-2)*70*s,y+130*s,2*s,'#e8c965');}ctx.restore();line(x+135*s,0,x+20*s,y-30*s,'#d5c6a1',3*s);circle(x+135*s,8*s,8*s,'#d5c6a1');drawThief(x,y,2.2*s); // scattered loot and vault accents
  for(let i=0;i<4;i++){let cx=x+(100+i*44)*s,cy=y+(130-Math.sin(i)*24)*s;circle(cx,cy,10*s,'#b38932');circle(cx-2*s,cy-2*s,7*s,'#f4cf67');ctx.fillStyle='#9f7928';ctx.font=`bold ${10*s}px sans-serif`;ctx.fillText('$',cx-5*s,cy+3*s);}}
-function renderGame(w,h){backdrop(w,h);let scale=h/C.HEIGHT, vw=w/scale;ctx.save();ctx.scale(scale,scale);let cam=run.camera;ctx.translate(-cam,0);
+function renderGame(w,h){backdrop(w,h,run.camera,run.time,save.reduced);drawVaultDepth(w,h,run.camera,run.time,save.reduced);let scale=h/C.HEIGHT, vw=w/scale;ctx.save();ctx.scale(scale,scale);let cam=run.camera;ctx.translate(-cam,0);
  // depth guides
  for(let x=Math.floor(cam/320)*320;x<cam+vw+320;x+=320){ctx.fillStyle='rgba(144,191,170,.035)';ctx.fillRect(x,0,2,720);ctx.strokeStyle='rgba(135,176,157,.06)';ctx.strokeRect(x+25,80,270,500);}
  for(const a of run.anchors){if(a.x<cam-50||a.x>cam+vw+50)continue;line(a.x,0,a.x,a.y-12,'#50655d',3);circle(a.x,a.y,12,'#344d48');circle(a.x,a.y,7,'#e5bd59');circle(a.x,a.y,3,'#f8e8ad');}

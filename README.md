@@ -13,6 +13,7 @@ Open `sling-heist-local.html` directly in a browser—no server or internet is n
 - `scripts/build-local.mjs`: creates the local HTML from the source files.
 - `game.js`: fixed-step game loop, seeded chunks, rendering, controls and progression.
 - `physics.js`: testable aim/grace, rope movement, release and swept hazard collision functions.
+- `background.js`: mirrored, looping vault backdrop and a second parallax layer; disabled by Reduced Motion.
 - `dialogue.js`: original contextual fourth-wall remarks for the thief.
 - `platform.js`: CrazyGames v3 boundary and local fallback; portal subclasses are starting points, not working integrations for those portals.
 - `config.js`: tuning constants and cosmetic catalog.
@@ -21,7 +22,7 @@ Open `sling-heist-local.html` directly in a browser—no server or internet is n
 
 ## Tuning reference
 
-All central physics and economy constants are in `config.js`: prototype gravity 1100 px/s²; overall simulation speed 0.72×; starting speed 260 px/s; drag 0.995/frame; grapple reach 450 px; cone ±60°; reel 0.995/frame; perfect window 20–70°; input buffer 100ms; coyote 90ms; chunks 320px; alarm 120 + 18√distance px/s, cap 520 (currently scaled vertically by `FLOOR_VERTICAL_FACTOR = 0.08` to accommodate the side-scrolling view, so this is **not** yet the exact requested floor speed); hazard telegraph 0.6s; revive 150 coins; invulnerability 2s; daily par 640m; reward cooldown 3 minutes. The catalog lists the cosmetic prices and colors.
+All central physics and economy constants are in `config.js`: prototype gravity 1100 px/s²; overall simulation speed 0.72×; starting speed 260 px/s; drag 0.995/frame; grapple reach 450 px; cone ±60°; reel 0.995/frame; perfect window 20–70°; input buffer 100ms; coyote 90ms; chunks 320px; alarm 120 + 18√distance px/s, cap 520 (currently scaled vertically by `FLOOR_VERTICAL_FACTOR = 0.08` to accommodate the side-scrolling view, so this is **not** yet the exact requested floor speed); hazard telegraph 0.6s; revive 150 coins; invulnerability 2s; daily par 640m; reward cooldown 3 minutes. The catalog lists the cosmetic prices and colors. Background parallax and drift speeds are tunable in `config.js`.
 
 ## CrazyGames submission QA
 

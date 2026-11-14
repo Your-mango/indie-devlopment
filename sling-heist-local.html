@@ -75,6 +75,11 @@
     DRAG: 0.995,
     TIME_SCALE: 0.72,
     START_SPEED: 260,
+    BACKGROUND_PARALLAX: 0.32,
+    BACKGROUND_DRIFT: 8,
+    BACKGROUND_DETAIL_PARALLAX: 0.62,
+    BACKGROUND_DETAIL_DRIFT: 12,
+    BACKGROUND_DETAIL_SPACING: 360,
     REACH: 450,
     CONE: Math.PI / 3,
     REEL: 0.995,
@@ -420,6 +425,28 @@
     const lines = DIALOGUE[kind] || [];
     if (!lines.length) return "";
     return lines[Math.min(lines.length - 1, Math.floor(random() * lines.length))];
+  }
+
+  // background.js
+  function backgroundTiles(width, height, imageWidth, imageHeight, camera = 0, time = 0, reducedMotion = false) {
+    if (width <= 0 || height <= 0 || imageWidth <= 0 || imageHeight <= 0) return [];
+    const scale = Math.max(width / imageWidth, height / imageHeight);
+    const tileWidth = imageWidth * scale, tileHeight = imageHeight * scale;
+    const worldScale = height / CONFIG.HEIGHT;
+    const distance = reducedMotion ? 0 : (camera * CONFIG.BACKGROUND_PARALLAX + time * CONFIG.BACKGROUND_DRIFT) * worldScale;
+    const period = tileWidth * 2, offset = (distance % period + period) % period;
+    const origin = (width - tileWidth) / 2 - offset;
+    const first = Math.floor(-origin / tileWidth);
+    const tiles = [];
+    for (let index = first, x = origin + first * tileWidth; x < width; index++, x += tileWidth) {
+      tiles.push({ x, y: (height - tileHeight) / 2, width: tileWidth, height: tileHeight, mirror: Math.abs(index % 2) === 1 });
+    }
+    return tiles;
+  }
+  function decorativeOffset(camera, time, reducedMotion = false) {
+    if (reducedMotion) return 0;
+    const distance = camera * CONFIG.BACKGROUND_DETAIL_PARALLAX + time * CONFIG.BACKGROUND_DETAIL_DRIFT;
+    return (distance % CONFIG.BACKGROUND_DETAIL_SPACING + CONFIG.BACKGROUND_DETAIL_SPACING) % CONFIG.BACKGROUND_DETAIL_SPACING;
   }
 
   // game.js
@@ -1185,16 +1212,37 @@
     ctx.stroke();
     ctx.restore();
   }
-  function backdrop(w, h) {
+  function backdrop(w, h, camera = 0, time = 0, reducedMotion = true) {
     ctx.fillStyle = "#0b2528";
     ctx.fillRect(0, 0, w, h);
     if (bg.complete && bg.naturalWidth) {
-      let scale = Math.max(w / bg.width, h / bg.height);
-      let sw = w / scale, sh = h / scale;
-      ctx.drawImage(bg, (bg.width - sw) / 2, (bg.height - sh) / 2, sw, sh, 0, 0, w, h);
+      for (const tile of backgroundTiles(w, h, bg.naturalWidth, bg.naturalHeight, camera, time, reducedMotion)) {
+        if (tile.mirror) {
+          ctx.save();
+          ctx.translate(tile.x + tile.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(bg, 0, tile.y, tile.width, tile.height);
+          ctx.restore();
+        } else ctx.drawImage(bg, tile.x, tile.y, tile.width, tile.height);
+      }
     }
     ctx.fillStyle = "rgba(2,17,19,.35)";
     ctx.fillRect(0, 0, w, h);
+  }
+  function drawVaultDepth(w, h, camera, time, reducedMotion) {
+    const scale = h / CONFIG.HEIGHT, width = w / scale, offset = decorativeOffset(camera, time, reducedMotion);
+    ctx.save();
+    ctx.scale(scale, scale);
+    for (let x = -offset - CONFIG.BACKGROUND_DETAIL_SPACING; x < width + CONFIG.BACKGROUND_DETAIL_SPACING; x += CONFIG.BACKGROUND_DETAIL_SPACING) {
+      ctx.fillStyle = "rgba(5,19,21,.18)";
+      ctx.fillRect(x, 0, 16, CONFIG.HEIGHT);
+      ctx.fillStyle = "rgba(150,195,178,.09)";
+      ctx.fillRect(x + 15, 0, 2, CONFIG.HEIGHT);
+      ctx.fillStyle = "rgba(237,192,94,.12)";
+      ctx.fillRect(x + 5, 95, 5, 18);
+      ctx.fillRect(x + 5, 530, 5, 18);
+    }
+    ctx.restore();
   }
   function renderMenu(w, h) {
     backdrop(w, h);
@@ -1218,7 +1266,8 @@
     }
   }
   function renderGame(w, h) {
-    backdrop(w, h);
+    backdrop(w, h, run.camera, run.time, save.reduced);
+    drawVaultDepth(w, h, run.camera, run.time, save.reduced);
     let scale = h / CONFIG.HEIGHT, vw = w / scale;
     ctx.save();
     ctx.scale(scale, scale);
