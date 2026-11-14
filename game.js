@@ -6,6 +6,7 @@ import {chooseDialogue} from './dialogue.js';
 
 const platform=new PlatformAdapter(), canvas=$('game'), ctx=canvas.getContext('2d');
 const bg=new Image();bg.src='assets/vault-bg.jpg';
+const raccoon=new Image();raccoon.src='assets/raccoon.png';
 const defaults={coins:0,best:0,skins:[0],trails:[0],bags:[0],skin:0,trail:0,bag:0,muted:false,reduced:false,clean:false,key:'Space',dailyDate:'',dailyAttempts:0,streakDate:'',streak:0,swings:0,perfects:0,firstChain:false,runs:0,lastVisit:'',missionDate:'',missionSwings:0,missionPerfects:0,missionDistance:0,missionClaimed:[]};
 let save={...defaults}, state='menu', run=null, last=0, accumulator=0, input=false, audio=null, adPlaying=false, blurred=false, sessionRevive=false, lastReward=0, challenge=null, shopTab='skins', frame=0, pausedFrom='playing';
 const today=()=>new Date().toISOString().slice(0,10);
@@ -30,7 +31,7 @@ function clearQuip(){clearTimeout(quipTimer);show('quip',false);}
 function setup(seed,mode='normal',ghost=null){
  clearTimeout(bannerTimer);
  const rng=mulberry32(seed);const runSkin=trial??save.skin;trial=null;run={seed,mode,rng,ghost,started:false,skin:runSkin,ghostTime:0,p:{x:100,y:390,px:100-C.START_SPEED*C.STEP,py:390},camera:0,floor:720,time:0,distance:0,coins:0,paidCoins:0,score:0,combo:0,perfects:0,perfectChain:0,rope:null,anchors:[],hazards:[],loot:[],chunks:0,holdBuffer:0,aim:{target:null,remaining:0},physicsDt:C.STEP,invuln:0,swingCount:0,path:[],sample:0,deathPath:[],deathTime:0,revived:false,safe:{x:100,y:390},near:0,slow:0,flash:0,hitstop:0,adChoice:false,doubled:false};
- for(let i=0;i<8;i++)chunk();state='ready';input=false;show('menu',false);show('overlay',false);show('hud');$('hud').classList.toggle('clean',save.clean);$('hint').innerHTML='HOLD TO START &amp; GRAPPLE <span>•</span> RELEASE TO FLY';show('hint');show('footer',false);platform.banner(false);showQuip('ready',{hold:true,force:true});if(mode==='daily')platform.event('daily_start',{seed});sound(310,.09);}
+ for(let i=0;i<8;i++)chunk();state='ready';$('app').classList.add('in-run');input=false;show('menu',false);show('overlay',false);show('hud');$('hud').classList.toggle('clean',save.clean);$('hint').innerHTML='HOLD TO START &amp; GRAPPLE <span>•</span> RELEASE TO FLY';show('hint');show('footer',false);platform.banner(false);showQuip('ready',{hold:true,force:true});if(mode==='daily')platform.event('daily_start',{seed});sound(310,.09);}
 function chunk(){let i=run.chunks++,x=300+i*C.CHUNK, r=run.rng, template=Math.floor(r()*12), y=150+r()*100; // Every anchor spacing is 320 < 85% of reach.
  run.anchors.push({x,y,baseY:y,moving:i>=10&&template%4===0,phase:r()*6.28});
  for(let j=0;j<3;j++)run.loot.push({x:x+40+j*65,y:330+Math.sin(j)*45+(r()-.5)*65,value:j===2&&template%3===0?10:5,taken:false});
@@ -72,9 +73,9 @@ function deathPanel(cause,record=false){scheduleBanner();let r=run;let offer=!r.
  if($('coinRevive'))$('coinRevive').onclick=()=>{if(save.coins<C.REVIVE_COST){toast('NOT ENOUGH COINS');return;}save.coins-=C.REVIVE_COST;persist();reviveRun();};
  if($('adRevive'))$('adRevive').onclick=async e=>{e.currentTarget.disabled=true;platform.event('rewarded_accepted',{reward:'revive'});if(await platform.ad('rewarded')){lastReward=Date.now();sessionRevive=true;reviveRun();toast('REVIVED!');}else{toast('AD UNAVAILABLE — TRY AGAIN LATER');deathPanel(cause);}};
  if($('double'))$('double').onclick=async e=>{e.currentTarget.disabled=true;platform.event('rewarded_accepted',{reward:'double'});if(await platform.ad('rewarded')){lastReward=Date.now();r.doubled=true;save.coins+=r.coins;persist();toast('LOOT DOUBLED!');deathPanel(cause);}else{toast('AD UNAVAILABLE — TRY AGAIN LATER');deathPanel(cause);}};
- $('share').onclick=()=>{platform.event('share_click',{type:'card'});downloadCard(r.distance,r.coins,SKINS[r.skin]?.[0]||'Thief',r.seed);};$('challenge').onclick=shareChallenge;$('home').onclick=menu;}
+ $('share').onclick=()=>{platform.event('share_click',{type:'card'});downloadCard(r.distance,r.coins,SKINS[r.skin]?.[0]||'Raccoon',r.seed);};$('challenge').onclick=shareChallenge;$('home').onclick=menu;}
 function reviveRun(){let r=run;r.revived=true;r.p.x=r.safe.x;r.p.y=Math.min(r.safe.y,r.floor-100);r.p.px=r.p.x-5;r.p.py=r.p.y;r.floor=Math.max(r.floor,r.p.y+230);r.invuln=C.INVULNERABILITY;r.rope=null;r.aim={target:null,remaining:0};r.physicsDt=C.STEP;state='ready';input=false;show('overlay',false);show('hud');$('hud').classList.toggle('clean',save.clean);$('hint').innerHTML='HOLD TO CONTINUE &amp; GRAPPLE <span>•</span> RELEASE TO FLY';show('hint');showQuip('ready',{hold:true,force:true});}
-function menu(){clearQuip();state='menu';scheduleBanner();input=false;platform.stop();show('overlay',false);show('hud',false);show('hint',false);show('menu');show('footer');persist();}
+function menu(){clearQuip();$('app').classList.remove('in-run');state='menu';scheduleBanner();input=false;platform.stop();show('overlay',false);show('hud',false);show('hint',false);show('menu');show('footer');persist();}
 function pausePanel(){panel('<span class="kicker">TAKE A BREATHER</span><h2>PAUSED.</h2><p>The vault can wait. Your loot is safe.</p><div class="buttons"><button id="resume">RESUME HEIST</button><button id="quit">MAIN MENU</button></div>');$('resume').onclick=resume;$('quit').onclick=menu;}
 function pause(){if(state!=='playing'&&state!=='ready')return;pausedFrom=state;if(state==='playing')release();input=false;state='paused';clearQuip();platform.stop();pausePanel();}
 function resume(){state=pausedFrom;show('overlay',false);if(state==='playing')platform.start();else showQuip('ready',{hold:true,force:true});}
@@ -95,8 +96,17 @@ function drawThief(x,y,scale=1,alpha=1){
  const active=(state==='playing'||state==='ready'||state==='paused'||state==='dead')&&run;
  const color=SKINS[active?run.skin:save.skin]?.[2]||'#efc55d',bag=BAGS[save.bag]?.[2]||'#b78d5c';
  const motion=save.reduced?0:Math.sin(frame*.08), swinging=active&&!!run.rope;
+ const rotation=swinging&&!save.reduced?Math.max(-.35,Math.min(.35,(run.p.x-run.p.px)*.035)):0;
+ const skin=active?run.skin:save.skin;
  ctx.save();ctx.translate(x,y+(state==='ready'?motion*1.5:0));ctx.scale(scale,scale);ctx.globalAlpha=alpha;
- if(swinging&&!save.reduced)ctx.rotate(Math.max(-.35,Math.min(.35,(run.p.x-run.p.px)*.035)));
+ if(rotation)ctx.rotate(rotation);
+ if(skin===0&&raccoon.complete&&raccoon.naturalWidth){
+   // A single illustration is gently posed as a whole; separate limb animation needs layered art.
+   ctx.drawImage(raccoon,-29,-48,58,74);
+   // A small colored tag keeps equipped bag cosmetics visible on the baked-in sack.
+   if(save.bag!==0){circle(-22,-5,3.4,bag);circle(-22,-5,1.2,'#f6e7b4');}
+   ctx.restore();return;
+ }
  // Bag and scarf tails give the silhouette readable motion even at a small size.
  ctx.save();ctx.rotate(-.22);roundRect(-32,-2,35,31,8,bag);ctx.fillStyle='#604c37';ctx.fillRect(-27,8,24,3);circle(-15,15,3,'#e9ce8a');ctx.restore();
  ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(-9,-15);ctx.lineTo(-30,-11-motion*2);ctx.lineTo(-26,-5-motion*2);ctx.lineTo(-8,-8);ctx.fill();
@@ -121,7 +131,15 @@ function renderGame(w,h){backdrop(w,h);let scale=h/C.HEIGHT, vw=w/scale;ctx.save
  let floor=run.floor;ctx.fillStyle='#c34d44';ctx.fillRect(cam,floor,vw,720-floor);ctx.fillStyle='#ff9671';ctx.fillRect(cam,floor,vw,4);ctx.fillStyle='rgba(255,188,133,.5)';for(let x=Math.floor(cam/75)*75;x<cam+vw;x+=75){ctx.beginPath();ctx.moveTo(x,floor+4);ctx.lineTo(x+20,floor+4);ctx.lineTo(x+8,floor+20);ctx.lineTo(x-12,floor+20);ctx.fill();}
  if(run.ghost&&run.ghost.length){let g=run.ghost[Math.min(run.ghost.length-1,Math.floor(run.time*10))];if(g)drawThief(g[0],g[1],.65,.3);}
  let p=run.p;if(state==='dead'&&run.deathPath.length){let index=Math.floor((run.deathTime*.5*10)%run.deathPath.length);let q=run.deathPath[index];if(q)p={x:q[0],y:q[1]};}
- if(run.rope){line(run.rope.anchor.x,run.rope.anchor.y,p.x,p.y,TRAILS[save.trail]?.[2]||'#dfc586',3);}
+ if(run.rope){
+   let handX=p.x,handY=p.y;
+   if(run.skin===0&&raccoon.complete&&raccoon.naturalWidth){
+     const rotation=save.reduced?0:Math.max(-.35,Math.min(.35,(run.p.x-run.p.px)*.035));
+     const ox=26*.8,oy=-19*.8;
+     handX+=Math.cos(rotation)*ox-Math.sin(rotation)*oy;handY+=Math.sin(rotation)*ox+Math.cos(rotation)*oy;
+   }
+   line(run.rope.anchor.x,run.rope.anchor.y,handX,handY,TRAILS[save.trail]?.[2]||'#dfc586',3);
+ }
  if(run.invuln>0){ctx.strokeStyle='#b9f4cf';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y,28,0,Math.PI*2);ctx.stroke();}drawThief(p.x,p.y,.8);ctx.restore();if(run.flash>0&&!save.reduced){ctx.fillStyle=`rgba(151,255,150,${run.flash*.18})`;ctx.fillRect(0,0,w,h);}}
 function loop(t){let elapsed=Math.min((t-last)/1000,.05)||0;last=t;accumulator+=elapsed;while(accumulator>=C.STEP){update(C.STEP);accumulator-=C.STEP;}if(state==='dead'&&run)run.deathTime+=elapsed;frame++;let w=canvas.width,h=canvas.height;ctx.setTransform(1,0,0,1,0,0);if(state==='menu'||state==='shop'||!run)renderMenu(w,h);else renderGame(w,h);requestAnimationFrame(loop);}
 requestAnimationFrame(loop);

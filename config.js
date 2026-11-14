@@ -9,6 +9,6 @@ export const CONFIG = Object.freeze({
   SAMPLE_RATE:.1, DEATH_CAM:5, REVIVE_COST:150, DAILY_PAR:640,
   REWARD_COOLDOWN:180000, PIXELS_PER_METER:10
 });
-export const SKINS=[['Thief',0,'#efc55d'],['Ninja',500,'#8699b1'],['Robot',700,'#7ed1c7'],['Cat',900,'#e8a68e'],['Skeleton',1100,'#e9eee1'],['Ghost',1400,'#a6dae7'],['Fox',1700,'#e77e50'],['Royal',2000,'#bc9be4'],['Viper',2400,'#a5d78a'],['Crimson',2800,'#e87977'],['Gold',3300,'#f6d75f'],['Shadow',4000,'#a38eb6']];
+export const SKINS=[['Raccoon',0,'#efc55d'],['Ninja',500,'#8699b1'],['Robot',700,'#7ed1c7'],['Cat',900,'#e8a68e'],['Skeleton',1100,'#e9eee1'],['Ghost',1400,'#a6dae7'],['Fox',1700,'#e77e50'],['Royal',2000,'#bc9be4'],['Viper',2400,'#a5d78a'],['Crimson',2800,'#e87977'],['Gold',3300,'#f6d75f'],['Shadow',4000,'#a38eb6']];
 export const TRAILS=[['Classic',0,'#dfc586'],['Mint',500,'#8ee3c1'],['Ruby',800,'#ed7775'],['Ice',1200,'#87d9f4'],['Violet',1800,'#b49aef'],['Gold',2500,'#ffdf6e']];
 export const BAGS=[['Canvas',0,'#b78d5c'],['Mint',500,'#81b8a1'],['Ruby',1000,'#cc7775'],['Gold',1800,'#e6bd5b']];

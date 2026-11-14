@@ -35,3 +35,6 @@
 /* Reserve room for the instructions under the thief's speech bubble. */
 .character-quip{bottom:calc(13% + 80px);width:max-content;max-width:min(420px,calc(100vw - 32px))}
 .game-hint{width:max-content}
+
+/* The dark menu vignette must not obscure the player while swinging. */
+#app.in-run .vignette{background:linear-gradient(0deg,rgba(4,15,18,.14),transparent 22%);}

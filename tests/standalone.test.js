@@ -7,6 +7,8 @@ test('single-file build has no external asset dependencies and starts a run in l
  const html=readFileSync('sling-heist-local.html','utf8');
  assert.doesNotMatch(html,/<script[^>]+src=|<link[^>]+href=|@import\s+url/i);
  assert.match(html,/data:image\/jpeg;base64,/);
+ assert.match(html,/data:image\/png;base64,/,'raccoon art is embedded');
+ assert.doesNotMatch(html,/assets\/raccoon\.png/,'no external sprite dependency');
  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
  assert.equal(scripts.length,2);
  const elements=new Map(),events={};
